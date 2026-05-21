@@ -1,0 +1,47 @@
+# =========================
+# Gradle
+# =========================
+.gradle/
+build/
+*/build/
+
+# Kotlin
+.kotlin/
+
+# =========================
+# Android Studio / IntelliJ
+# =========================
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Local environment
+local.properties
+
+# =========================
+# OS junk
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# NDK / native (safe preemptive)
+# =========================
+.externalNativeBuild/
+.cxx/
+
+# =========================
+# optional: test / output artifacts
+# =========================
+captures/
+
+# =========================
+# Android Studio template app module (not part of the library)
+# =========================
+app/
