@@ -1,4 +1,13 @@
 package io.mcqbis.ai.imagequalitygate
 
-class ImageQualityGate {
+import android.graphics.Bitmap
+
+object ImageQualityGate {
+    fun analyze(
+        bitmap: Bitmap,
+        weights: QualityMetricWeights = QualityMetricWeights()
+    ): ImageQualityResult {
+
+        TODO()
+    }
 }
