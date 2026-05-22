@@ -40,8 +40,3 @@ Thumbs.db
 # optional: test / output artifacts
 # =========================
 captures/
-
-# =========================
-# Android Studio template app module (not part of the library)
-# =========================
-app/

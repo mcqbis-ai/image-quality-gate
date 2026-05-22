@@ -21,3 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "ImageQualityGate"
 include(":image-quality-gate")
+include(":sample-app", ":image-quality-gate")
