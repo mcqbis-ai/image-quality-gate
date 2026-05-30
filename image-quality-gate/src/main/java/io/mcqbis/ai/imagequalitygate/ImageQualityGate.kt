@@ -28,13 +28,7 @@ object ImageQualityGate {
     ): ImageQualityResult {
 
         val (processed, preprocessingTime) =
-            if (enableDebugInfo) {
-                measureIf(true) {
-                    ImageProcessor.preprocess(bitmap)
-                }
-            } else {
-                ImageProcessor.preprocess(bitmap) to 0L
-            }
+            measureIf<Bitmap>(enableDebugInfo) { ImageProcessor.preprocess(bitmap) }
 
         val (blurScore, blurTime) =
             if (weights.blur != 0f)
