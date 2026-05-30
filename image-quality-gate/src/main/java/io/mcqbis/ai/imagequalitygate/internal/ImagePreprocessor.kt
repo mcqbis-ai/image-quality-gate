@@ -5,32 +5,22 @@ import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
-import android.util.Log
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.scale
 
 
 internal object ImageProcessor {
 
-    fun preprocess(input: Bitmap): ProcessResult {
-
-        val start = System.nanoTime()
+    fun preprocess(input: Bitmap): Bitmap {
 
         val gray = toGrayscale(input)
         val resized = resize(gray, 256, 256)
 
-        val end = System.nanoTime()
-
-        val timeMs = (end - start) / 1_000_000
-
-        Log.d("ImageProcessor", "Preprocess time: ${timeMs}ms")
-
-        return ProcessResult(
-            bitmap = resized,
-            timeMs = timeMs
-        )
+        return resized
     }
 
     private fun resize(bitmap: Bitmap, w: Int, h: Int): Bitmap {
-        return Bitmap.createScaledBitmap(bitmap, w, h, true)
+        return bitmap.scale(w, h)
     }
 
     private fun toGrayscale(src: Bitmap): Bitmap {
@@ -38,7 +28,7 @@ internal object ImageProcessor {
         val width = src.width
         val height = src.height
 
-        val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val output = createBitmap(width, height)
 
         val canvas = Canvas(output)
         val paint = Paint()
