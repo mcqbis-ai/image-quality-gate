@@ -10,7 +10,9 @@ data class ImageQualityResult(
 
     val contrastScore: Float?,
 
-    val summaryScore: Float
+    val summaryScore: Float,
+
+    val debugInfo: DebugInfo?,
 ) {
 
     fun isTooBlurry(
