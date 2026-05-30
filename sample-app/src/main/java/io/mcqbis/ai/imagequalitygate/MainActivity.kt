@@ -9,23 +9,24 @@ import androidx.activity.compose.setContent
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
-import io.mcqbis.ai.imagequalitygate.ImageQualityGate
 import java.util.concurrent.Executors
-import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
 
     private val cameraExecutor = Executors.newSingleThreadExecutor()
-    private var imageCapture: ImageCapture? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,9 +34,7 @@ class MainActivity : ComponentActivity() {
         requestCameraPermission()
 
         setContent {
-            DebugCameraScreen(
-                onCaptureRequest = { capture() }
-            )
+            DebugCameraScreen()
         }
     }
 
@@ -53,116 +52,170 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun capture(onResult: ((Bitmap) -> Unit)? = null) {
-        val imageCapture = imageCapture ?: return
-
-        imageCapture.takePicture(
-            cameraExecutor,
-            object : ImageCapture.OnImageCapturedCallback() {
-
-                override fun onCaptureSuccess(image: ImageProxy) {
-                    val bitmap = image.toBitmap()
-                    image.close()
-
-                    onResult?.invoke(bitmap)
-                }
-            }
-        )
-    }
-
     @Composable
-    fun DebugCameraScreen(
-        onCaptureRequest: () -> Unit
-    ) {
+    fun DebugCameraScreen() {
 
-        var resultText by remember { mutableStateOf("No image yet") }
+        var selectedTab by remember { mutableIntStateOf(0) }
+        var qualityResult by remember { mutableStateOf<ImageQualityResult?>(null) }
+        var preprocessedBitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+        val tabs = listOf("Metrics", "Preview")
 
         Column(modifier = Modifier.fillMaxSize()) {
 
             CameraPreview(
-                onImageCaptureReady = { captureRef ->
-                    imageCapture = captureRef
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                onResult = { result ->
+                    qualityResult = result
+                    preprocessedBitmap = result.debugInfo?.preprocessedBitmap
                 }
             )
 
-            Button(
-                onClick = {
-
-//                    capture { bitmap ->
-//
-//                        val result = ImageQualityGate.analyze(bitmap)
-//
-//                        resultText = """
-//                            Blur: ${result.blurScore}
-//                            Exposure: ${result.exposureScore}
-//                            Noise: ${result.noiseScore}
-//                            Contrast: ${result.contrastScore}
-//                            Summary: ${result.summaryScore}
-//                        """.trimIndent()
-//                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Capture & Analyze")
+            TabRow(selectedTabIndex = selectedTab) {
+                tabs.forEachIndexed { index, title ->
+                    Tab(
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        text = { Text(title) }
+                    )
+                }
             }
 
-            Text(
-                text = resultText,
-                modifier = Modifier.padding(16.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .padding(16.dp),
+                contentAlignment = Alignment.TopStart
+            ) {
+                when (selectedTab) {
+                    0 -> MetricsTab(result = qualityResult)
+                    1 -> PreviewTab(bitmap = preprocessedBitmap)
+                }
+            }
         }
     }
 
     @Composable
-    fun CameraPreview(
-        onImageCaptureReady: (ImageCapture) -> Unit
-    ) {
+    fun MetricsTab(result: ImageQualityResult?) {
+        if (result == null) {
+            Text("Oczekiwanie na analizę…")
+            return
+        }
 
+        val debug = result.debugInfo
+
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            // Header
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text("Metryka", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium)
+                Text("Wynik", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium)
+                Text("Czas", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium)
+            }
+            HorizontalDivider()
+
+            // Preprocessing — brak score
+            MetricTableRow("Preprocessing", score = null, timeMs = debug?.preprocessingTimeMs)
+            MetricTableRow("Rozmycie",      score = result.blurScore,     timeMs = debug?.blurTimeMs)
+            MetricTableRow("Ekspozycja",    score = result.exposureScore,  timeMs = debug?.exposureTimeMs)
+            MetricTableRow("Szum",          score = result.noiseScore,     timeMs = debug?.noiseTimeMs)
+            MetricTableRow("Kontrast",      score = result.contrastScore,  timeMs = debug?.contrastTimeMs)
+
+            HorizontalDivider()
+            MetricTableRow("Łącznie", score = result.summaryScore, timeMs = debug?.totalTimeMs)
+        }
+    }
+
+    @Composable
+    fun MetricTableRow(label: String, score: Float?, timeMs: Long?) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(label,                                          modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+            Text(score?.let { "%.3f".format(it) } ?: "—",       modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+            Text(timeMs?.let { "${it} ms" } ?: "—",             modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+        }
+    }
+
+    @Composable
+    fun PreviewTab(bitmap: Bitmap?) {
+        if (bitmap == null) {
+            Text("Oczekiwanie na podgląd…")
+            return
+        }
+
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = "Wstępnie przetworzone zdjęcie",
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+
+    @Composable
+    fun CameraPreview(
+        modifier: Modifier = Modifier,
+        onResult: (ImageQualityResult) -> Unit
+    ) {
         val context = LocalContext.current
         val previewView = remember { PreviewView(context) }
 
-        AndroidView(factory = {
+        // Callback wrapped in ref to avoid restarting the camera on recomposition
+        val onResultRef = rememberUpdatedState(onResult)
 
-            val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+        AndroidView(
+            factory = {
+                val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
 
-            cameraProviderFuture.addListener({
+                cameraProviderFuture.addListener({
+                    val cameraProvider = cameraProviderFuture.get()
 
-                val cameraProvider = cameraProviderFuture.get()
+                    val preview = Preview.Builder().build()
+                    preview.setSurfaceProvider(previewView.surfaceProvider)
 
-                val preview = Preview.Builder().build()
+                    var lastAnalysisMs = 0L
+                    val frameIntervalMs = 200L // 5 FPS
 
-                val imageCapture = ImageCapture.Builder()
-                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                    .build()
+                    val imageAnalysis = ImageAnalysis.Builder()
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .build()
 
-                val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+                    imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
+                        val now = System.currentTimeMillis()
+                        if (now - lastAnalysisMs >= frameIntervalMs) {
+                            lastAnalysisMs = now
 
-                preview.setSurfaceProvider(previewView.surfaceProvider)
+                            val bitmap = imageProxy.toBitmap()
+                            val result = ImageQualityGate.analyze(
+                                bitmap,
+                                enableDebugInfo = true
+                            )
+                            onResultRef.value(result)
+                        }
+                        imageProxy.close()
+                    }
 
-                cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
-                    context as LifecycleOwner,
-                    cameraSelector,
-                    preview,
-                    imageCapture
-                )
+                    cameraProvider.unbindAll()
+                    cameraProvider.bindToLifecycle(
+                        context as LifecycleOwner,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        preview,
+                        imageAnalysis
+                    )
+                }, ContextCompat.getMainExecutor(context))
 
-                onImageCaptureReady(imageCapture)
-
-            }, ContextCompat.getMainExecutor(context))
-
-            previewView
-        })
+                previewView
+            },
+            modifier = modifier
+        )
     }
 }
 
-/**
- * Convert ImageProxy → Bitmap (MVP version)
- */
 fun ImageProxy.toBitmap(): Bitmap {
     val buffer = planes[0].buffer
     val bytes = ByteArray(buffer.remaining())
     buffer.get(bytes)
-
     return android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
 }
